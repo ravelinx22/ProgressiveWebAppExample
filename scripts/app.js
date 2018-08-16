@@ -65,7 +65,6 @@
 
 	// Updates a timestation card with the latest weather forecast. If the card
 	// doesn't already exist, it's cloned from the template.
-
 	app.updateTimetableCard = function (data) {
 		var key = data.key;
 		var dataLastUpdated = new Date(data.created);
@@ -109,8 +108,7 @@
 	 ****************************************************************************/
 
 	app.saveSchedules = function() {
-		var selectedTimetables = JSON.stringify(app.selectedTimetables);
-		localStorage.selectedTimetables = selectedTimetables;
+		addSchedules(app.selectedTimetables);
 	}
 
 	app.getSchedule = function (key, label) {
@@ -191,38 +189,74 @@
 
 	};
 
+	/*****************************************************************************
+	 *
+	 * Methods for dealing IndexDB
+	 *
+	 ****************************************************************************/
+	var indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
+	let request = indexedDB.open("Schedules", 1),
+		db,
+		tx,
+		store,
+		index;
+
+	request.onupgradeneeded = function(e) {
+		let db = request.result,
+			store = db.createObjectStore("ScheduleStore", {
+				keyPath: "key"
+			});
+	}
+
+	request.onerror = function(e) {
+		console.log("There was an error" + e.target.errorCode);
+	}
+
+	request.onsuccess = function(e) {
+		db = request.result;
+		setup();
+	}
+
+	function addSchedules(schedules) {
+		db = request.result;
+		tx = db.transaction("ScheduleStore", "readwrite");
+		store = tx.objectStore("ScheduleStore");
+		for(var i = 0; i < schedules.length; i++) {
+			let posi = schedules[i];
+			console.log(posi);
+			store.put(schedules[i]);
+		}
+	}
+
+	function setup() {
+		db = request.result;
+		tx = db.transaction("ScheduleStore", "readwrite");
+		store = tx.objectStore("ScheduleStore");
+		let query = store.getAll();
+		query.onsuccess = function() {
+			let data = query.result;
+			if(data.length > 0) {
+				app.selectedTimetables = data;
+				app.selectedTimetables.forEach(function(table) {
+					app.getSchedule(table.key, table.label);
+				});
+			} else {
+				app.updateTimetableCard(initialStationTimetable);
+				app.selectedTimetables = [
+					{key: initialStationTimetable.key, label: initialStationTimetable.label}
+				];
+				app.saveSchedules();
+			}
+		}
+	}
+
+
 
 	/************************************************************************
 	 *
 	 * Code required to start the app
 	 *
-	 * NOTE: To simplify this codelab, we've used localStorage.
-	 *   localStorage is a synchronous API and has serious performance
-	 *   implications. It should not be used in production applications!
-	 *   Instead, check out IDB (https://www.npmjs.com/package/idb) or
-	 *   SimpleDB (https://gist.github.com/inexorabletash/c8069c042b734519680c)
 	 ************************************************************************/
-	app.selectedTimetables = localStorage.selectedTimetables;
-	if (app.selectedTimetables) {
-		console.log("entro arriba");
-		app.selectedTimetables = JSON.parse(app.selectedTimetables);
-		app.selectedTimetables.forEach(function(table) {
-			app.getSchedule(table.key, table.label);
-		});
-	} else {
-		console.log("entro abajo");
-		/* The user is using the app for the first time, or the user has not
-		 * saved any cities, so show the user some fake data. A real app in this
-		 * scenario could guess the user's location via IP lookup and then inject
-		 * that data into the page.
-		 */
-		app.updateTimetableCard(initialStationTimetable);
-		app.selectedTimetables = [
-			{key: initialStationTimetable.key, label: initialStationTimetable.label}
-		];
-		app.saveSchedules();
-	}
-
 	if ('serviceWorker' in navigator) {
 		navigator.serviceWorker
 			.register('./sw.js')
