@@ -94,11 +94,12 @@
 			}
 		}
 
-		if (app.isLoading) {
-			app.spinner.setAttribute('hidden', true);
-			app.container.removeAttribute('hidden');
-			app.isLoading = false;
-		}
+    if (app.isLoading) {
+            window.cardLoadTime = performance.now();
+            app.spinner.setAttribute('hidden', true);
+            app.container.removeAttribute('hidden');
+            app.isLoading = false;
+    }
 	};
 
 	/*****************************************************************************
@@ -138,6 +139,9 @@
 		request.onreadystatechange = function () {
 			if (request.readyState === XMLHttpRequest.DONE) {
 				if (request.status === 200) {
+          if(!window.apiResponseTime) {
+            window.apiResponseTime = performance.now();
+          }
 					var response = JSON.parse(request.response);
 					var result = {};
 					result.key = key;
@@ -223,7 +227,6 @@
 		store = tx.objectStore("ScheduleStore");
 		for(var i = 0; i < schedules.length; i++) {
 			let posi = schedules[i];
-			console.log(posi);
 			store.put(schedules[i]);
 		}
 	}
@@ -246,6 +249,9 @@
 					{key: initialStationTimetable.key, label: initialStationTimetable.label}
 				];
 				app.saveSchedules();
+        app.selectedTimetables.forEach(function(table) {
+					app.getSchedule(table.key, table.label);
+				});
 			}
 		}
 	}
